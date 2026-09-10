@@ -208,21 +208,99 @@
     document.getElementById('warn').style.display = 'block';
   }
 
+  // iPhone/Safariの日本語音声の中から、できるだけ柔らかく落ち着いた声を選ぶ
   var selectedVoice = null;
   function pickJapaneseVoice() {
     if (!synth) return;
-    var voices = synth.getVoices();
-    selectedVoice = voices.find(function (v) {
+    var voices = synth.getVoices().filter(function (v) {
       return v.lang && v.lang.toLowerCase().indexOf('ja') === 0;
-    }) || null;
+    });
+    if (!voices.length) { selectedVoice = null; return; }
+    function score(v) {
+      var name = (v.name + ' ' + v.voiceURI).toLowerCase();
+      var s = 0;
+      if (name.indexOf('premium') > -1) s += 4;   // 高品質(なめらか)な声を優先
+      if (name.indexOf('enhanced') > -1) s += 4;
+      if (name.indexOf('siri') > -1) s += 2;
+      if (name.indexOf('kyoko') > -1) s += 1;     // 標準搭載の柔らかめの声
+      if (name.indexOf('o-ren') > -1) s += 1;
+      if (name.indexOf('female') > -1) s += 1;
+      return s;
+    }
+    voices.sort(function (a, b) { return score(b) - score(a); });
+    selectedVoice = voices[0];
   }
   if (synth) {
     pickJapaneseVoice();
     synth.onvoiceschanged = pickJapaneseVoice;
   }
 
+  // 自律訓練法向けに、低め・ゆっくりめに調整した声のプロファイル
+  var VOICE_BASE = { rate: 0.80, pitch: 0.92 };     // 準備・呼吸・消去動作のナレーション
+  var VOICE_FEELING = { rate: 0.68, pitch: 0.84 };  // 「重い」「温かい」の言葉かけ(より低く、ゆっくり)
+
   // ---- 台本(スクリプト)データ ----
-  // silence: そのセリフを話し終えてから、次に進むまでの沈黙(秒)
+  // text: 画面表示。speak: 読み上げる文字列(省略時はtextを読み上げる)。
+  // silence: そのセリフを話し終えてから、次に進むまでの沈黙(秒)。
+  var HAND_R = { display: '右手', speech: '右手' };
+  var HAND_L = { display: '左手', speech: '左手' };
+  var FOOT_R = { display: '右足', speech: 'みぎあし' };   // 「足」は必ず「あし」と読ませる
+  var FOOT_L = { display: '左足', speech: 'ひだりあし' };
+  var HAND_FOOT_BOTH = { display: '両手・両足', speech: '両手、りょうあし' };
+
+  var HEAVY = { display: 'おも〜い', speech: 'おもーい' };
+  var WARM = { display: 'あたたか〜い', speech: 'あたたかーい' };
+
+  // 「右手が……おもーい……」(間)「右手が……おもーい……」のように、
+  // 主語と言葉かけの間、そして繰り返しの間に、十分な沈黙を入れる
+  function feelingCue(phase, subject, feeling, opts) {
+    opts = opts || {};
+    var inner = opts.inner != null ? opts.inner : 2.5;      // 「右手が」と「おもーい」の間
+    var repeatGap = opts.repeatGap != null ? opts.repeatGap : 5; // 1回目と2回目の間
+    var after = opts.after != null ? opts.after : 10;       // 次の言葉かけに進むまで
+    var display = subject.display + 'が、' + feeling.display;
+    var subjectSpeech = subject.speech + 'が';
+    return [
+      { phase: phase, text: display, speak: subjectSpeech, voice: VOICE_FEELING, silence: inner },
+      { phase: phase, text: display, speak: feeling.speech, voice: VOICE_FEELING, silence: repeatGap },
+      { phase: phase, text: display, speak: subjectSpeech, voice: VOICE_FEELING, silence: inner },
+      { phase: phase, text: display, speak: feeling.speech, voice: VOICE_FEELING, silence: after }
+    ];
+  }
+
+  function scaleOpts(base, scale) {
+    return {
+      inner: Math.round(base.inner * scale * 10) / 10,
+      repeatGap: Math.round(base.repeatGap * scale * 10) / 10,
+      after: Math.round(base.after * scale * 10) / 10
+    };
+  }
+
+  function buildHeavyEach(scale) {
+    var o = scaleOpts({ inner: 2.5, repeatGap: 5, after: 10 }, scale);
+    return [].concat(
+      feelingCue('重感', HAND_R, HEAVY, o),
+      feelingCue('重感', HAND_L, HEAVY, o),
+      feelingCue('重感', FOOT_R, HEAVY, o),
+      feelingCue('重感', FOOT_L, HEAVY, o)
+    );
+  }
+  function buildHeavyAll(scale) {
+    return feelingCue('重感', HAND_FOOT_BOTH, HEAVY, scaleOpts({ inner: 2.5, repeatGap: 5, after: 14 }, scale));
+  }
+  function buildWarmEach(scale) {
+    var o = scaleOpts({ inner: 2.5, repeatGap: 5, after: 10 }, scale);
+    return [].concat(
+      feelingCue('温感', HAND_R, WARM, o),
+      feelingCue('温感', HAND_L, WARM, o),
+      feelingCue('温感', FOOT_R, WARM, o),
+      feelingCue('温感', FOOT_L, WARM, o)
+    );
+  }
+  function buildWarmAll(scale) {
+    return feelingCue('温感', HAND_FOOT_BOTH, WARM, scaleOpts({ inner: 2.5, repeatGap: 5, after: 14 }, scale));
+  }
+
   var PHASES = {
     intro: [
       { phase: '準備', text: '楽な姿勢を取りましょう。椅子に深く座るか、仰向けに横になってください。', silence: 6 },
@@ -230,20 +308,6 @@
       { phase: '準備', text: 'それでは、自律訓練法を始めます。', silence: 4 },
       { phase: '準備', text: '気持ちが、とても落ち着いています。', silence: 10 }
     ],
-    heavyEach: [
-      { phase: '重感', text: '右腕が、重たいです。', silence: 12 },
-      { phase: '重感', text: '左腕が、重たいです。', silence: 12 },
-      { phase: '重感', text: '右脚が、重たいです。', silence: 12 },
-      { phase: '重感', text: '左脚が、重たいです。', silence: 12 }
-    ],
-    heavyAll: { phase: '重感', text: '両腕、両脚が、重たいです。', silence: 15 },
-    warmEach: [
-      { phase: '温感', text: '右腕が、温かいです。', silence: 12 },
-      { phase: '温感', text: '左腕が、温かいです。', silence: 12 },
-      { phase: '温感', text: '右脚が、温かいです。', silence: 12 },
-      { phase: '温感', text: '左脚が、温かいです。', silence: 12 }
-    ],
-    warmAll: { phase: '温感', text: '両腕、両脚が、温かいです。', silence: 15 },
     breathing: [
       { phase: '自然な呼吸', text: '呼吸が、とても楽になっています。', silence: 12 },
       { phase: '自然な呼吸', text: '自然に、ゆったりと呼吸しています。', silence: 12 }
@@ -251,7 +315,7 @@
     cancellation: [
       { phase: '消去動作', text: 'それでは、終わりにしましょう。消去動作を行います。', silence: 2 },
       { phase: '消去動作', text: '両手を、ぎゅっと強く握ってください。', silence: 4 },
-      { phase: '消去動作', text: '腕を、曲げたり伸ばしたりしてください。', silence: 5 },
+      { phase: '消去動作', text: '手を、曲げたり伸ばしたりしてください。', silence: 5 },
       { phase: '消去動作', text: '大きく、伸びをしてください。', silence: 5 },
       { phase: '消去動作', text: '深呼吸を、一回してください。', silence: 5 },
       { phase: '消去動作', text: 'ゆっくりと、目を開けてください。', silence: 3 },
@@ -260,31 +324,26 @@
   };
 
   function buildScript(minutes) {
+    // コースが長いほど、重感・温感の沈黙(間)を長くする
+    var scale = minutes === 5 ? 1 : (minutes === 10 ? 1.25 : 1.5);
     var script = [];
     script = script.concat(PHASES.intro);
 
     if (minutes === 5) {
-      script.push(PHASES.heavyAll, PHASES.heavyAll);
-      script.push(PHASES.warmAll, PHASES.warmAll);
-      script.push(PHASES.breathing[0]);
+      script = script.concat(buildHeavyAll(scale));
+      script = script.concat(buildWarmAll(scale));
+      script = script.concat(PHASES.breathing.slice(0, 1));
     } else if (minutes === 10) {
-      script = script.concat(PHASES.heavyEach);
-      script.push(PHASES.heavyAll);
-      script = script.concat(PHASES.warmEach);
-      script.push(PHASES.warmAll);
+      script = script.concat(buildHeavyEach(scale), buildHeavyAll(scale));
+      script = script.concat(buildWarmEach(scale), buildWarmAll(scale));
       script = script.concat(PHASES.breathing);
     } else {
       // 15分: 重感・温感を2巡する
-      script = script.concat(PHASES.heavyEach);
-      script.push(PHASES.heavyAll);
-      script = script.concat(PHASES.heavyEach);
-      script.push(PHASES.heavyAll);
-      script = script.concat(PHASES.warmEach);
-      script.push(PHASES.warmAll);
-      script = script.concat(PHASES.warmEach);
-      script.push(PHASES.warmAll);
-      script = script.concat(PHASES.breathing);
-      script = script.concat(PHASES.breathing);
+      script = script.concat(buildHeavyEach(scale), buildHeavyAll(scale));
+      script = script.concat(buildHeavyEach(scale), buildHeavyAll(scale));
+      script = script.concat(buildWarmEach(scale), buildWarmAll(scale));
+      script = script.concat(buildWarmEach(scale), buildWarmAll(scale));
+      script = script.concat(PHASES.breathing, PHASES.breathing);
     }
 
     script = script.concat(PHASES.cancellation);
@@ -350,10 +409,11 @@
       return;
     }
 
-    var utter = new SpeechSynthesisUtterance(seg.text);
+    var voiceProfile = seg.voice || VOICE_BASE;
+    var utter = new SpeechSynthesisUtterance(seg.speak || seg.text);
     utter.lang = 'ja-JP';
-    utter.rate = 0.82;
-    utter.pitch = 1.0;
+    utter.rate = voiceProfile.rate;
+    utter.pitch = voiceProfile.pitch;
     utter.volume = 1.0;
     if (selectedVoice) utter.voice = selectedVoice;
 
