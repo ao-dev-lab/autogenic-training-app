@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#123045">
+<title>自律訓練法ガイド</title>
+<style>
+  :root {
+    --bg: #0f2436;
+    --bg-2: #123045;
+    --card: #16374f;
+    --text: #eaf4fb;
+    --muted: #9fc0d6;
+    --accent: #4fb0c6;
+    --accent-2: #3d8ea0;
+    --danger: #c96a5a;
+    --danger-2: #a9543f;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+    height: 100%;
+  }
+  body {
+    min-height: 100vh;
+    padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 16px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    text-align: center;
+    margin: 20px 0 4px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: center;
+    margin-bottom: 18px;
+  }
+  .card {
+    width: 100%;
+    max-width: 480px;
+    background: var(--card);
+    border-radius: 20px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .section-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 10px;
+    letter-spacing: 0.05em;
+  }
+  .course-row {
+    display: flex;
+    gap: 10px;
+  }
+  .course-btn {
+    flex: 1;
+    padding: 16px 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 14px;
+    border: 2px solid var(--accent-2);
+    background: transparent;
+    color: var(--text);
+  }
+  .course-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #05262f;
+  }
+  .course-btn:disabled {
+    opacity: 0.5;
+  }
+  .status-card {
+    text-align: center;
+    padding: 28px 20px;
+  }
+  .phase-label {
+    font-size: 1rem;
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    min-height: 1.4em;
+  }
+  .phrase-text {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.5;
+    margin: 14px 0;
+    min-height: 3.2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .time-display {
+    font-size: 2rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+  }
+  .time-target {
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .controls {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .big-btn {
+    width: 100%;
+    padding: 26px 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    border-radius: 20px;
+    border: none;
+    color: #fff;
+    background: var(--accent-2);
+    box-shadow: 0 4px 0 rgba(0,0,0,0.25);
+  }
+  .big-btn:active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.25);
+  }
+  .big-btn.start { background: var(--accent-2); }
+  .big-btn.toggle { background: #3d6b8e; }
+  .big-btn.end { background: var(--danger-2); }
+  .big-btn:disabled {
+    opacity: 0.4;
+    box-shadow: none;
+  }
+  .hint {
+    max-width: 480px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+    margin: 18px 0 6px;
+    line-height: 1.6;
+  }
+  .warn {
+    max-width: 480px;
+    background: #4a2d2d;
+    color: #f5c8bd;
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    text-align: center;
+    margin-bottom: 14px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+  <h1>自律訓練法ガイド</h1>
+  <div class="subtitle">日本語音声で、ゆっくり誘導します</div>
+
+  <div id="warn" class="warn">
+    このブラウザは音声読み上げ(音声合成)に対応していないようです。iPhoneのSafariでお試しください。
+  </div>
+
+  <div class="card">
+    <div class="section-label">コースを選ぶ</div>
+    <div class="course-row">
+      <button class="course-btn" data-min="5">5分</button>
+      <button class="course-btn active" data-min="10">10分</button>
+      <button class="course-btn" data-min="15">15分</button>
+    </div>
+  </div>
+
+  <div class="card status-card">
+    <div class="phase-label" id="phaseLabel">準備ができたら「開始」を押してください</div>
+    <div class="phrase-text" id="phraseText">&nbsp;</div>
+    <div class="time-display" id="timeDisplay">00:00</div>
+    <div class="time-target" id="timeTarget">目安: 10分</div>
+  </div>
+
+  <div class="controls">
+    <button class="big-btn start" id="startBtn">開始</button>
+    <button class="big-btn toggle" id="toggleBtn" disabled>一時停止</button>
+    <button class="big-btn end" id="endBtn" disabled>終了</button>
+  </div>
+
+  <div class="hint">
+    イヤホンでもスピーカーでも聞けます。画面を見なくても、下の3つの大きなボタンだけで操作できます。<br>
+    サイレント(マナー)モードがオンだと音が出ない場合があります。iPhone横のスイッチをご確認ください。
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var synth = window.speechSynthesis;
+  if (!synth) {
+    document.getElementById('warn').style.display = 'block';
+  }
+
+  var selectedVoice = null;
+  function pickJapaneseVoice() {
+    if (!synth) return;
+    var voices = synth.getVoices();
+    selectedVoice = voices.find(function (v) {
+      return v.lang && v.lang.toLowerCase().indexOf('ja') === 0;
+    }) || null;
+  }
+  if (synth) {
+    pickJapaneseVoice();
+    synth.onvoiceschanged = pickJapaneseVoice;
+  }
+
+  // ---- 台本(スクリプト)データ ----
+  // silence: そのセリフを話し終えてから、次に進むまでの沈黙(秒)
+  var PHASES = {
+    intro: [
+      { phase: '準備', text: '楽な姿勢を取りましょう。椅子に深く座るか、仰向けに横になってください。', silence: 6 },
+      { phase: '準備', text: '目を閉じて、身体の力を抜いてください。', silence: 8 },
+      { phase: '準備', text: 'それでは、自律訓練法を始めます。', silence: 4 },
+      { phase: '準備', text: '気持ちが、とても落ち着いています。', silence: 10 }
+    ],
+    heavyEach: [
+      { phase: '重感', text: '右腕が、重たいです。', silence: 12 },
+      { phase: '重感', text: '左腕が、重たいです。', silence: 12 },
+      { phase: '重感', text: '右脚が、重たいです。', silence: 12 },
+      { phase: '重感', text: '左脚が、重たいです。', silence: 12 }
+    ],
+    heavyAll: { phase: '重感', text: '両腕、両脚が、重たいです。', silence: 15 },
+    warmEach: [
+      { phase: '温感', text: '右腕が、温かいです。', silence: 12 },
+      { phase: '温感', text: '左腕が、温かいです。', silence: 12 },
+      { phase: '温感', text: '右脚が、温かいです。', silence: 12 },
+      { phase: '温感', text: '左脚が、温かいです。', silence: 12 }
+    ],
+    warmAll: { phase: '温感', text: '両腕、両脚が、温かいです。', silence: 15 },
+    breathing: [
+      { phase: '自然な呼吸', text: '呼吸が、とても楽になっています。', silence: 12 },
+      { phase: '自然な呼吸', text: '自然に、ゆったりと呼吸しています。', silence: 12 }
+    ],
+    cancellation: [
+      { phase: '消去動作', text: 'それでは、終わりにしましょう。消去動作を行います。', silence: 2 },
+      { phase: '消去動作', text: '両手を、ぎゅっと強く握ってください。', silence: 4 },
+      { phase: '消去動作', text: '腕を、曲げたり伸ばしたりしてください。', silence: 5 },
+      { phase: '消去動作', text: '大きく、伸びをしてください。', silence: 5 },
+      { phase: '消去動作', text: '深呼吸を、一回してください。', silence: 5 },
+      { phase: '消去動作', text: 'ゆっくりと、目を開けてください。', silence: 3 },
+      { phase: '消去動作', text: 'これで、自律訓練法を終わります。お疲れ様でした。', silence: 1 }
+    ]
+  };
+
+  function buildScript(minutes) {
+    var script = [];
+    script = script.concat(PHASES.intro);
+
+    if (minutes === 5) {
+      script.push(PHASES.heavyAll, PHASES.heavyAll);
+      script.push(PHASES.warmAll, PHASES.warmAll);
+      script.push(PHASES.breathing[0]);
+    } else if (minutes === 10) {
+      script = script.concat(PHASES.heavyEach);
+      script.push(PHASES.heavyAll);
+      script = script.concat(PHASES.warmEach);
+      script.push(PHASES.warmAll);
+      script = script.concat(PHASES.breathing);
+    } else {
+      // 15分: 重感・温感を2巡する
+      script = script.concat(PHASES.heavyEach);
+      script.push(PHASES.heavyAll);
+      script = script.concat(PHASES.heavyEach);
+      script.push(PHASES.heavyAll);
+      script = script.concat(PHASES.warmEach);
+      script.push(PHASES.warmAll);
+      script = script.concat(PHASES.warmEach);
+      script.push(PHASES.warmAll);
+      script = script.concat(PHASES.breathing);
+      script = script.concat(PHASES.breathing);
+    }
+
+    script = script.concat(PHASES.cancellation);
+    return script;
+  }
+
+  // ---- 状態管理 ----
+  var selectedMinutes = 10;
+  var script = [];
+  var currentIndex = 0;
+  var isRunning = false;
+  var isPaused = false;
+  var elapsedSeconds = 0;
+  var timerInterval = null;
+  var silenceTimeoutId = null;
+
+  var courseButtons = document.querySelectorAll('.course-btn');
+  var startBtn = document.getElementById('startBtn');
+  var toggleBtn = document.getElementById('toggleBtn');
+  var endBtn = document.getElementById('endBtn');
+  var phaseLabel = document.getElementById('phaseLabel');
+  var phraseText = document.getElementById('phraseText');
+  var timeDisplay = document.getElementById('timeDisplay');
+  var timeTarget = document.getElementById('timeTarget');
+
+  courseButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (isRunning) return;
+      selectedMinutes = parseInt(btn.getAttribute('data-min'), 10);
+      courseButtons.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      timeTarget.textContent = '目安: ' + selectedMinutes + '分';
+    });
+  });
+
+  function formatTime(totalSeconds) {
+    var m = Math.floor(totalSeconds / 60);
+    var s = totalSeconds % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function tick() {
+    elapsedSeconds += 1;
+    timeDisplay.textContent = formatTime(elapsedSeconds);
+  }
+
+  function speakSegment(i) {
+    if (!isRunning) return;
+    if (i >= script.length) {
+      finishSession();
+      return;
+    }
+    currentIndex = i;
+    var seg = script[i];
+    phaseLabel.textContent = seg.phase;
+    phraseText.textContent = seg.text;
+
+    if (!synth) {
+      // 音声合成が使えない場合は、テキスト表示だけで進める
+      silenceTimeoutId = setTimeout(function () {
+        speakSegment(i + 1);
+      }, (seg.silence || 1) * 1000);
+      return;
+    }
+
+    var utter = new SpeechSynthesisUtterance(seg.text);
+    utter.lang = 'ja-JP';
+    utter.rate = 0.82;
+    utter.pitch = 1.0;
+    utter.volume = 1.0;
+    if (selectedVoice) utter.voice = selectedVoice;
+
+    utter.onend = function () {
+      if (!isRunning || isPaused) return;
+      silenceTimeoutId = setTimeout(function () {
+        if (!isRunning || isPaused) return;
+        speakSegment(i + 1);
+      }, (seg.silence || 0) * 1000);
+    };
+    utter.onerror = function () {
+      if (!isRunning || isPaused) return;
+      silenceTimeoutId = setTimeout(function () {
+        if (!isRunning || isPaused) return;
+        speakSegment(i + 1);
+      }, (seg.silence || 0) * 1000);
+    };
+
+    synth.speak(utter);
+  }
+
+  function finishSession() {
+    isRunning = false;
+    isPaused = false;
+    clearInterval(timerInterval);
+    startBtn.disabled = false;
+    toggleBtn.disabled = true;
+    toggleBtn.textContent = '一時停止';
+    endBtn.disabled = true;
+    courseButtons.forEach(function (b) { b.disabled = false; });
+    phaseLabel.textContent = '終了しました';
+  }
+
+  function startSession() {
+    if (isRunning) return;
+    script = buildScript(selectedMinutes);
+    currentIndex = 0;
+    elapsedSeconds = 0;
+    isRunning = true;
+    isPaused = false;
+
+    timeDisplay.textContent = '00:00';
+    startBtn.disabled = true;
+    toggleBtn.disabled = false;
+    toggleBtn.textContent = '一時停止';
+    endBtn.disabled = false;
+    courseButtons.forEach(function (b) { b.disabled = true; });
+
+    if (synth) synth.cancel();
+    timerInterval = setInterval(tick, 1000);
+    speakSegment(0);
+  }
+
+  function pauseSession() {
+    if (!isRunning || isPaused) return;
+    isPaused = true;
+    if (synth) synth.cancel();
+    clearTimeout(silenceTimeoutId);
+    clearInterval(timerInterval);
+    toggleBtn.textContent = '再開';
+    phaseLabel.textContent = '一時停止中';
+  }
+
+  function resumeSession() {
+    if (!isRunning || !isPaused) return;
+    isPaused = false;
+    toggleBtn.textContent = '一時停止';
+    timerInterval = setInterval(tick, 1000);
+    speakSegment(currentIndex);
+  }
+
+  function endSession() {
+    if (!isRunning) return;
+    isRunning = false;
+    isPaused = false;
+    if (synth) synth.cancel();
+    clearTimeout(silenceTimeoutId);
+    clearInterval(timerInterval);
+
+    startBtn.disabled = false;
+    toggleBtn.disabled = true;
+    toggleBtn.textContent = '一時停止';
+    endBtn.disabled = true;
+    courseButtons.forEach(function (b) { b.disabled = false; });
+
+    phaseLabel.textContent = '終了しました';
+    phraseText.textContent = ' ';
+  }
+
+  startBtn.addEventListener('click', startSession);
+  endBtn.addEventListener('click', endSession);
+  toggleBtn.addEventListener('click', function () {
+    if (isPaused) {
+      resumeSession();
+    } else {
+      pauseSession();
+    }
+  });
+
+  // iOS Safariはタブを閉じたり画面を切り替えると音声合成が止まることがあるため、
+  // 復帰時に読み上げが止まっていたら再開を試みる
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && isRunning && !isPaused && synth) {
+      if (!synth.speaking && !silenceTimeoutId) {
+        speakSegment(currentIndex);
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
